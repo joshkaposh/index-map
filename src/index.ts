@@ -1,4 +1,4 @@
-import { ExactSizeDoubleEndedIterator, Iterator, Range, done, iter, range } from "joshkaposh-iterator";
+import { DoubleEndedIterator, ExactSizeDoubleEndedIterator, Iterator, Range, done, iter, range } from "joshkaposh-iterator";
 import { is_none, is_some, swap, swap_2, type Option } from "./util";
 import { TODO } from "joshkaposh-iterator/src/util";
 
@@ -26,8 +26,8 @@ export class IndexMap<K, V> {
         return this.as_entries().collect();
     }
 
-    as_entries(): Iterator<[K, V]> {
-        return iter(this.#indices.values()).map((k) => {
+    as_entries(): DoubleEndedIterator<[K, V]> {
+        return iter(this.#indices).map((k) => {
             const v = this.#map.get(k)![1];
             return [k, v]
         })
@@ -144,7 +144,7 @@ export class IndexMap<K, V> {
         return this.len() === 0;
     }
 
-    iter(): Iterator<[K, V]> {
+    iter(): DoubleEndedIterator<[K, V]> {
         return this.as_entries();
     }
 
@@ -397,7 +397,7 @@ export class IndexMap<K, V> {
         }
     }
 
-    values(): Iterator<V> {
+    values(): DoubleEndedIterator<V> {
         // @ts-expect-error
         return this.as_entries().map(([_, v]) => v);
     }
