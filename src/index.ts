@@ -433,6 +433,10 @@ export class IndexMap<K, V> {
             tuple[0] = i;
         }
     }
+
+    [Symbol.iterator](): Iterator<[K, V]> {
+        return this.as_entries();
+    }
 }
 
 class Drain<K, V> extends Iterator<[K, V]> {
