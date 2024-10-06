@@ -11,6 +11,25 @@ function insert(map: IndexMap<string, string>, k: number, v: number) {
     map.insert(`key-${k}`, `value-${v}`);
 }
 
+test('sort', () => {
+    const expected = [[0, 1], [1, 1], [2, 1], [5, 4]]
+    const s = new IndexMap([[1, 1], [0, 1], [5, 4], [2, 1]]);
+
+    s.sort_keys();
+    expect(s.as_array()).toEqual(expected);
+    s.sort_by((k1, v1, k2, v2) => {
+        if (k1 < k2) {
+            return 1
+        } else if (k1 === k2) {
+            return 0
+        } else {
+            return -1
+        }
+    })
+    expect(s.as_array()).toEqual(iter(expected).rev().collect());
+    assert(s.is_sorted())
+})
+
 test('get_range', () => {
     const m = new IndexMap<string, string>()
 
@@ -135,7 +154,6 @@ test('move_index', () => {
      * [k2, v2] [v3, v3] [k4, v4] [k1, v1]
      */
     expect([...m.values()]).toEqual(['v2', 'v3', 'v4', 'v1']);
-    console.log(...m.values());
 })
 
 test('shift_insert', () => {
@@ -211,7 +229,7 @@ test('splice', () => {
         map.insert(i, null)
     }
 
-    let removed = map.splice(range(0, count), map.as_slice().reverse())
+    let removed = map.splice(range(0, count), map.as_array().reverse())
     let i = -1
     let expected = count + 1;
     for (const [k] of removed) {
