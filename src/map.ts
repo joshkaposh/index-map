@@ -23,7 +23,7 @@ export class IndexMap<K extends Ord, V> {
     #indices: K[];
     // #keys: Set<K>;
 
-    constructor(map?: Iterable<readonly [K, V]>)
+    constructor(map?: IterInputType<readonly [K, V]>)
     constructor(map?: Map<K, Bucket<V>>, indices?: K[])
     constructor(map: Map<K, Bucket<V>> | IterInputType<readonly [K, V]> = new Map(), indices: K[] = []) {
         if (map instanceof Map) {
@@ -347,7 +347,7 @@ export class IndexMap<K extends Ord, V> {
         this.#sync_indices();
     }
 
-    splice(range: Range, replace_with: Iterable<[K, V]>): Splice<K, V> {
+    splice(range: Range, replace_with: IterInputType<[K, V]>): Splice<K, V> {
         return new Splice(this.#map, this.#indices, range, replace_with)
     }
 

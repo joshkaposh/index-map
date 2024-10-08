@@ -135,8 +135,8 @@ export class IndexSet<T = Ord> {
         return this.#map.is_sorted();
     }
 
-    splice(range: Range, replace_with: Iterable<[T, Unit]>): Splice<T, Unit> {
-        return this.#map.splice(range, replace_with as Iterable<[Orderable<T>, Unit]>)
+    splice(range: Range, replace_with: IterInputType<[T, Unit]>): Splice<T, Unit> {
+        return this.#map.splice(range, replace_with as IterInputType<[Orderable<T>, Unit]>)
     }
 
     split_off(at: number): IndexSet<T> {

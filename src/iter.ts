@@ -1,4 +1,4 @@
-import { done, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, iter, Iterator, Range, SizeHint } from 'joshkaposh-iterator';
+import { done, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, iter, Iterator, IterInputType, Range, SizeHint } from 'joshkaposh-iterator';
 import { Bucket, IndexMap, IndexSet, Orderable } from ".";
 import { Option } from 'joshkaposh-option';
 
@@ -193,7 +193,7 @@ export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
     #front: number;
     #back: number;
 
-    constructor(map: Map<K, Bucket<V>>, indices: K[], range: Range, replace_with: Iterable<[K, V]>) {
+    constructor(map: Map<K, Bucket<V>>, indices: K[], range: Range, replace_with: IterInputType<[K, V]>) {
         super();
         this.#map = map;
         this.#indices = indices
