@@ -8,11 +8,19 @@ export type Ord = Option<(string) & string | (boolean) & boolean | (number) & nu
     [Symbol.toPrimitive](): string;
 }> & {}
 
-export type Bucket<T> = [number, T];
+function oob(index: number, bounds: number) {
+    return index < 0 || index >= bounds
+}
 
+export type Bucket<T> = [number, T];
+export type Entry<K, V> = [number, K, V];
+
+const INDEX = 0;
+const VALUE = 1;
 export class IndexMap<K extends Ord, V> {
     #map: Map<K, Bucket<V>>;
     #indices: K[];
+    // #keys: Set<K>;
 
     constructor(map?: Iterable<readonly [K, V]>)
     constructor(map?: Map<K, Bucket<V>>, indices?: K[])
@@ -20,12 +28,14 @@ export class IndexMap<K extends Ord, V> {
         if (map instanceof Map) {
             this.#map = map;
             this.#indices = indices;
+            // this.#keys = new Set(indices);
         } else {
             const entries = iter(map).enumerate().map(([i, [k, v]]) => [k, [i, v]] as [K, Bucket<V>]).collect();
             // @ts-expect-error
             const keys = iter(entries).map(([k]) => k).collect() as K[]
             this.#map = new Map(entries)
             this.#indices = keys
+            // this.#keys = new Set(keys);
         }
     }
 
@@ -75,39 +85,37 @@ export class IndexMap<K extends Ord, V> {
         return this.#get_unchecked(key);
     }
 
-    get_full(key: K): Option<[number, K, V]> {
-        const v = this.#map.get(key);
-        if (is_none(v)) {
-            return null
+    get_full(key: K): Option<Entry<K, V>> {
+        const v = this.#map.get(key)!;
+        if (!v) {
+            return
         }
         const [index, value] = v;
         return [index, key, value];
     }
 
     get_index(index: number): Option<V> {
-        if (index < 0 || index >= this.len()) {
-            return null
-        }
-        return this.#map.get(this.#indices[index])![1];
+        return oob(index, this.len()) ? undefined : this.#map.get(this.#indices[index])![1]!
     }
 
     get_index_entry(index: number): Option<[K, V]> {
-        if (index < 0 || index >= this.len()) {
-            return null
+        if (oob(index, this.len())) {
+            return
         }
+
         const k = this.#indices[index];
         const [_, v] = this.#map.get(k)!
         return [k, v];
     }
 
     get_index_of(key: K): Option<number> {
-        const v = this.#map.get(key);
-        return is_some(v) ? v[0] : null;
+        const bucket = this.#map.get(key);
+        return bucket ? bucket[INDEX] : null;
     }
 
     get_key_value(key: K): Option<[K, V]> {
-        const value = this.#map.get(key);
-        return is_some(value) ? [key, value[1]] : null;
+        const bucket = this.#map.get(key);
+        return bucket ? [key, bucket[VALUE]] : null;
     }
 
     get_range(range: Range): Iterator<V> {
@@ -117,10 +125,10 @@ export class IndexMap<K extends Ord, V> {
     }
 
     insert(key: K, value: V): Option<V> {
-        const data = this.#map.get(key);
-        if (is_some(data)) {
-            const old_val = data[1]
-            data[1] = value
+        const bucket = this.#map.get(key);
+        if (bucket) {
+            const old_val = bucket[VALUE]
+            bucket[VALUE] = value
             return old_val;
         }
         this.#map.set(key, [this.len(), value]);
@@ -129,11 +137,11 @@ export class IndexMap<K extends Ord, V> {
     }
 
     insert_full(key: K, value: V): [number, Option<V>] {
-        const data = this.#map.get(key);
-        if (is_some(data)) {
-            const old_val = data[1]
-            data[1] = value
-            return [data[0], old_val];
+        const bucket = this.#map.get(key);
+        if (bucket) {
+            const old_val = bucket[VALUE]
+            bucket[VALUE] = value
+            return [bucket[INDEX], old_val];
         }
         const idx = this.len()
         this.#map.set(key, [idx, value]);
@@ -236,17 +244,27 @@ export class IndexMap<K extends Ord, V> {
             return
         }
         let idx = -1;
-        for (const value of this.#map.values()) {
+        for (const bucket of this.#map.values()) {
             idx++;
             if (idx < index) {
                 continue
             }
-            value[0] -= 1;
+            bucket[INDEX] -= 1;
         }
     }
 
     retain(keep: (key: K, value: V) => boolean) {
-        TODO('IndexMap::retain()', keep);
+        // keep only the elements this closure returns true for
+        const entries = this.iter().rev();
+
+        entries.for_each(([k, v]) => {
+            if (!keep(k, v)) {
+                this.shift_remove(k);
+            }
+        })
+
+
+        // TODO('IndexMap::retain()', keep);
     }
 
     reverse() {
@@ -260,7 +278,7 @@ export class IndexMap<K extends Ord, V> {
     shift(): Option<V> {
         return this.#map.size > 0 ?
             this.shift_remove(this.#indices[0]) :
-            null
+            undefined
     }
 
     shift_insert(index: number, key: K, value: V): Option<V> {
@@ -268,16 +286,16 @@ export class IndexMap<K extends Ord, V> {
             throw new RangeError(`index ${index} cannot exceed length ${this.len()}`)
         }
 
-        const old = this.get_full(key);
-        if (old) {
-            const oldval = old[2]
-            old[2] = value
-            this.move_index(old[0], index);
+        const bucket = this.get_full(key);
+        if (bucket) {
+            const oldval = bucket[2]
+            bucket[2] = value
+            this.move_index(bucket[INDEX], index);
             return oldval;
         } else {
             this.#indices.splice(index, 0, key);
             this.#map.set(key, [index, value]);
-            this.#sync_indices(index, this.#indices.length);
+            this.#sync_indices(index);
             return null;
         }
     }
@@ -300,19 +318,19 @@ export class IndexMap<K extends Ord, V> {
         return [key, v];
     }
 
-    shift_remove_full(key: K): Option<[number, K, V]> {
-        // const item = this.#map.get(key);
-        if (!this.#map.has(key)) {
-            return null
+    shift_remove_full(key: K): Option<Entry<K, V>> {
+        const item = this.#map.get(key);
+        if (!item) {
+            return
         }
-        const [index, value] = this.#map.get(key)!
+        const [index, value] = item
         return this.#shift_remove_full_unchecked(index, key, value);
     }
 
     shift_remove_index(index: number): Option<V> {
         const k = this.#indices[index];
         if (!is_some(k)) {
-            return null
+            return
         }
         const [_, value] = this.#map.get(k)!
         return this.#shift_remove_full_unchecked(index, k, value)[2];
@@ -373,11 +391,11 @@ export class IndexMap<K extends Ord, V> {
         return full ? [full[1], full[2]] : null;
     }
 
-    swap_remove_full(key: K): Option<[number, K, V]> {
+    swap_remove_full(key: K): Option<Entry<K, V>> {
         const value = this.get_full(key);
         // TODO
-        if (is_none(value)) {
-            return null;
+        if (!value) {
+            return
         }
 
         const [index] = value;
@@ -411,10 +429,10 @@ export class IndexMap<K extends Ord, V> {
 
     #get_unchecked(key: K): Option<V> {
         const v = this.#map.get(key);
-        return is_some(v) ? v[1] : null;
+        return v ? v[1] : undefined;
     }
 
-    #shift_remove_full_unchecked(index: number, key: K, value: V): [number, K, V] {
+    #shift_remove_full_unchecked(index: number, key: K, value: V): Entry<K, V> {
         this.#map.delete(key);
         this.#indices.splice(index, 1);
         this.#remove_shift_indices(index);

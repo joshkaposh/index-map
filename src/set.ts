@@ -1,7 +1,7 @@
 import { type IterInputType, DoubleEndedIterator, iter, range, Range } from 'joshkaposh-iterator';
 import { Drain, IndexMap, Ord, Orderable, Splice } from './map'
 import { Option } from './util';
-import { Difference, SymmetricDifference, Union } from './iter';
+import { Difference, Intersection, SymmetricDifference, Union } from './iter';
 import { TODO } from 'joshkaposh-iterator/src/util';
 
 export type Unit = null;
@@ -11,7 +11,7 @@ export const unit = null;
 export class IndexSet<T = Ord> {
     #map: IndexMap<Orderable<T>, Unit>;
     constructor(map?: IndexMap<Orderable<T>, Unit>)
-    constructor(iterable: IterInputType<T>)
+    constructor(iterable?: IterInputType<T>)
     constructor(map: IndexMap<Orderable<T>, Unit> | IterInputType<T> = new IndexMap()) {
         map = (map instanceof IndexMap ? map : new IndexMap(iter(map).map(x => [x, unit] as [Orderable<T>, Unit])))
         this.#map = map;
@@ -67,6 +67,10 @@ export class IndexSet<T = Ord> {
 
     union(other: IndexSet<T>): DoubleEndedIterator<T> {
         return new Union(this, other)
+    }
+
+    intersection(other: IndexSet<T>): DoubleEndedIterator<T> {
+        return new Intersection(this, other)
     }
 
     pop(): Option<T> {

@@ -1,6 +1,7 @@
-import { done, DoubleEndedIterator } from 'joshkaposh-iterator'
+import { done, DoubleEndedIterator } from 'joshkaposh-iterator';
 import { IndexSet } from ".";
 import { Option } from 'joshkaposh-option';
+
 
 export class Intersection<T> extends DoubleEndedIterator<T> {
     #iter: DoubleEndedIterator<T>;

@@ -2,24 +2,14 @@ import { test, expect, assert } from 'vitest'
 import { IndexSet } from '../src/index';
 
 test('difference', () => {
+
     const s1 = new IndexSet([1, 2, 3, 4])
     const s2 = new IndexSet([3, 4, 5, 6])
+
     expect(s1.difference(s2).collect()).toEqual([1, 2]);
     expect(s2.difference(s1).collect()).toEqual([5, 6]);
-
     expect(s1.symmetric_difference(s2).collect()).toEqual([1, 2, 5, 6])
-})
-
-test('union', () => {
-    const s1 = new IndexSet([1, 2, 3, 4])
-    const s2 = new IndexSet([3, 4, 5, 6])
-    const s3 = new IndexSet(s1.union(s2));
-    // expect(s3.values().collect()).toEqual([3, 4]);
-})
-
-test('iter', () => {
-    const set = new IndexSet();
-    const other = new IndexSet()
+    expect(s1.union(s2).collect()).toEqual([1, 2, 3, 4, 5, 6]);
 })
 
 test('indexset', () => {
@@ -37,10 +27,6 @@ test('indexset', () => {
 
     expect(s1.values().collect()).toEqual([0, 1, 4, 5]);
     expect(s2.values().collect()).toEqual([]);
-
-    s1 = new IndexSet([1, 2, 3, 4])
-    s2 = new IndexSet([3, 4, 5, 6])
-    const diff = s1.difference(s2)
 })
 
 test('is_subset_superset', () => {
@@ -84,3 +70,9 @@ test('is_disjoint', () => {
     assert(!a.is_disjoint(b))
 })
 
+test('retain', () => {
+    const set = new IndexSet([1, 2, 3, 4, 5]);
+    set.retain(v => v % 2 === 0);
+    expect(set.iter().collect()).toEqual([2, 4]);
+    assert(set.len() === 2);
+})

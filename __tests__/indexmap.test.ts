@@ -11,6 +11,19 @@ function insert(map: IndexMap<string, string>, k: number, v: number) {
     map.insert(`key-${k}`, `value-${v}`);
 }
 
+test('retain', () => {
+    const map = new IndexMap<number, number>();
+
+    for (const v of range(0, 5)) {
+        map.insert(v, v + 1);
+    }
+    assert(map.len() === 5)
+
+    map.retain((k) => k % 2 === 0);
+    assert(map.len() === 3)
+    console.log(map.as_array());
+})
+
 test('sort', () => {
     const expected = [[0, 1], [1, 1], [2, 1], [5, 4]]
     const s = new IndexMap([[1, 1], [0, 1], [5, 4], [2, 1]]);
