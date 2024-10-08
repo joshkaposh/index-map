@@ -18,6 +18,6 @@
     "vitest": "^1.5.1"
   },
   "dependencies": {
-    "joshkaposh-iterator": "^1.0.9"
+    "joshkaposh-iterator": "^1.1.3"
   }
 }

@@ -1,6 +1,7 @@
-import { DoubleEndedIterator, ExactSizeDoubleEndedIterator, IterInputType, Iterator, Range, done, iter, range } from "joshkaposh-iterator";
+import { DoubleEndedIterator, IterInputType, Iterator, Range, iter, range } from "joshkaposh-iterator";
 import { is_none, is_some, swap, swap_2, type Option } from "./util";
 import { TODO } from "joshkaposh-iterator/src/util";
+import { Drain, Splice } from "./iter";
 
 export type Orderable<T> = T extends Ord ? T : never
 
@@ -31,7 +32,6 @@ export class IndexMap<K extends Ord, V> {
             // this.#keys = new Set(indices);
         } else {
             const entries = iter(map).enumerate().map(([i, [k, v]]) => [k, [i, v]] as [K, Bucket<V>]).collect();
-            // @ts-expect-error
             const keys = iter(entries).map(([k]) => k).collect() as K[]
             this.#map = new Map(entries)
             this.#indices = keys
@@ -41,7 +41,6 @@ export class IndexMap<K extends Ord, V> {
 
     static from<K extends Ord, V>(iterable: IterInputType<[K, V]>): IndexMap<K, V> {
         const entries = iter(iterable).enumerate().map(([i, [k, v]]) => [k, [i, v]] as [K, Bucket<V>]).collect();
-        // @ts-expect-error
         const indices = iter(entries).map(([k]) => k).collect() as K[]
 
         return new IndexMap(new Map(entries), indices);
@@ -357,7 +356,6 @@ export class IndexMap<K extends Ord, V> {
             throw new RangeError(`IndexMap::slit_off() index ${at} cannot be > ${this.len()} and < 0`)
         }
 
-        // @ts-expect-error
         const indices = range(at, this.#indices.length).map(i => this.#indices[i]).collect() as K[];
         const entries = Array.from(indices, (k, i) => {
             const v = this.#map.get(k)![1];
@@ -423,8 +421,11 @@ export class IndexMap<K extends Ord, V> {
     }
 
     values(): DoubleEndedIterator<V> {
-        // @ts-expect-error
-        return this.as_entries().map(([_, v]) => v);
+        return this.iter().map(([_, v]) => v);
+    }
+
+    [Symbol.iterator](): Iterator<[K, V]> {
+        return this.iter();
     }
 
     #get_unchecked(key: K): Option<V> {
@@ -457,112 +458,4 @@ export class IndexMap<K extends Ord, V> {
             tuple[0] = i;
         }
     }
-
-    [Symbol.iterator](): Iterator<[K, V]> {
-        return this.as_entries();
-    }
-}
-
-export class Drain<K, V> extends Iterator<[K, V]> {
-    #map: IndexMap<Orderable<K>, V>;
-    #taken: V[];
-    #r: Range;
-    constructor(range: Range, map: IndexMap<Orderable<K>, V>) {
-        super();
-        this.#r = range;
-        this.#map = map;
-        this.#taken = []
-    }
-
-    override into_iter(): Iterator<[K, V]> {
-        return this
-    }
-
-    next(): IteratorResult<[K, V]> {
-        const ni = this.#r.next();
-
-        if (ni.done) {
-            return done()
-        } else {
-            const index = ni.value - this.#taken.length;
-            const elt = this.#map.get_index_entry(index)!;
-            this.#taken.push(elt[1]);
-            this.#map.shift_remove(elt[0]);
-            return { done: false, value: [elt[0], elt[1]] }
-        }
-    }
-}
-
-export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
-    #r: Range;
-    #replace: Iterator<[K, V]>
-    #map: Map<K, Bucket<V>>;
-    #indices: K[];
-
-    #front: number;
-    #back: number;
-
-    constructor(map: Map<K, Bucket<V>>, indices: K[], range: Range, replace_with: Iterable<[K, V]>) {
-        super();
-        this.#map = map;
-        this.#indices = indices
-        this.#r = range;
-        this.#replace = iter(replace_with);
-
-        this.#front = -1;
-        this.#back = map.size;
-
-    }
-
-    override into_iter(): ExactSizeDoubleEndedIterator<[K, V]> {
-        return this;
-    }
-
-    #splice(i: number, k: K, v: V): IteratorResult<[K, V]> {
-        const old_key = this.#indices[i];
-        const old_val = this.#map.get(old_key)![1];
-        this.#indices[i] = k
-        if (old_key === k) {
-            this.#map.delete(old_key)
-        }
-        this.#map.set(k, [i, v]);
-
-        return { done: false, value: [old_key, old_val] };
-    }
-
-    override next(): IteratorResult<[K, V]> {
-        this.#front++;
-        if (this.#front >= this.#back) {
-            return done()
-        }
-
-        const nexti = this.#r.next();
-        const nextkv = this.#replace.next();
-        if (nexti.done || nextkv.done) {
-            return done();
-        }
-
-        const i = nexti.value;
-        const [k, v] = nextkv.value;
-        return this.#splice(i, k, v);
-    }
-
-    override next_back(): IteratorResult<[K, V]> {
-        this.#back--;
-        if (this.#front >= this.#back) {
-            return done()
-        }
-
-        const nexti = this.#r.next_back();
-        const nextkv = this.#replace.next();
-
-        if (nexti.done || nextkv.done) {
-            return done();
-        }
-
-        const i = nexti.value;
-        const [k, v] = nextkv.value;
-        return this.#splice(i, k, v);
-    }
-
 }

@@ -14,8 +14,8 @@ test('difference', () => {
 
 test('indexset', () => {
 
-    let s1 = new IndexSet<number>()
-    let s2 = new IndexSet<number>();
+    const s1 = new IndexSet<number>()
+    const s2 = new IndexSet<number>();
 
     s1.insert(0);
     s1.insert(1);

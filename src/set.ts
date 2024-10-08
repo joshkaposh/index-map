@@ -1,12 +1,11 @@
 import { type IterInputType, DoubleEndedIterator, iter, range, Range } from 'joshkaposh-iterator';
-import { Drain, IndexMap, Ord, Orderable, Splice } from './map'
+import { IndexMap, Ord, Orderable } from './map'
 import { Option } from './util';
-import { Difference, Intersection, SymmetricDifference, Union } from './iter';
+import { Difference, Intersection, SymmetricDifference, Union, Drain, Splice } from './iter';
 import { TODO } from 'joshkaposh-iterator/src/util';
 
 export type Unit = null;
 export const unit = null;
-
 
 export class IndexSet<T = Ord> {
     #map: IndexMap<Orderable<T>, Unit>;
