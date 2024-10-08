@@ -502,7 +502,7 @@ export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
     #front: number;
     #back: number;
 
-    constructor(map: Map<K, NoInfer<Bucket<V>>>, indices: K[], range: Range, replace_with: Iterable<[K, V]>) {
+    constructor(map: Map<K, Bucket<V>>, indices: K[], range: Range, replace_with: Iterable<[K, V]>) {
         super();
         this.#map = map;
         this.#indices = indices
