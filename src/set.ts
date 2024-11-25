@@ -2,7 +2,6 @@ import { type IterInputType, DoubleEndedIterator, iter, range, Range } from 'jos
 import { IndexMap, Ord, Orderable } from './map'
 import { Option } from './util';
 import { Difference, Intersection, SymmetricDifference, Union, Drain, Splice } from './iter';
-import { TODO } from 'joshkaposh-iterator/src/util';
 
 export type Unit = null;
 export const unit = null;
@@ -22,6 +21,10 @@ export class IndexSet<T = Ord> {
 
     append(other: IndexSet<T>): void {
         other.drain(range(0, other.len())).for_each(([x]) => this.insert(x as Orderable<T>))
+    }
+
+    clear() {
+        this.#map.clear();
     }
 
     contains(x: T): boolean {
@@ -60,6 +63,7 @@ export class IndexSet<T = Ord> {
     difference(other: IndexSet<T>): DoubleEndedIterator<T> {
         return new Difference(this, other)
     }
+
     symmetric_difference(other: IndexSet<T>): DoubleEndedIterator<T> {
         return new SymmetricDifference(this, other)
     }
@@ -203,7 +207,8 @@ export class IndexSet<T = Ord> {
     }
 
     insert_before(index: number, value: Orderable<T>): [number, boolean] {
-        return TODO('IndexSet::insert_before', index, value)
+        const res = this.#map.shift_insert(index, value, null)
+        return [index, res === null];
     }
 
     keys(): DoubleEndedIterator<T> {
