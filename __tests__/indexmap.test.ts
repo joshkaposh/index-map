@@ -1,6 +1,6 @@
 import { test, expect, assert } from 'vitest'
 import { IndexMap } from '../src';
-import { is_some } from '../src/util';
+import { is_some } from 'joshkaposh-option';
 import { iter, range } from 'joshkaposh-iterator';
 
 function fill_str(str: string, len: number, start = 0) {
@@ -21,7 +21,6 @@ test('retain', () => {
 
     map.retain((k) => k % 2 === 0);
     assert(map.len() === 3)
-    console.log(map.as_array());
 })
 
 test('sort', () => {
@@ -176,7 +175,7 @@ test('shift_insert', () => {
         map.insert(c, null);
     })
 
-    assert(map.get_index_of('*') === null);
+    assert(map.get_index_of('*') === undefined);
     map.shift_insert(10, '*', null);
     assert(map.get_index_of('*') === 10);
 

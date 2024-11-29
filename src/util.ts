@@ -1,14 +1,10 @@
-export type None = null | undefined;
-export type Some<T> = T extends None ? never : T;
-export type Option<T> = T | None;
+import { is_some, Option } from "joshkaposh-option";
 
-export function is_some<T>(value: Option<T>): value is T {
-    return (value ?? null) !== null;
-}
+export type Orderable<T> = T extends Ord ? T : never
 
-export function is_none<T>(value: Option<T>): value is None {
-    return (value ?? null) === null;
-}
+export type Ord = Option<(string) & string | (boolean) & boolean | (number) & number | {
+    [Symbol.toPrimitive](): string;
+}> & {}
 
 /**
  * @description
@@ -47,12 +43,10 @@ export function swap_2<T>(src: T[], target: T[], index: number) {
 }
 
 export function swap_remove<T>(array: T[], i: number): Option<T> {
-    if (array.length > 0 && i !== array.length - 1) {
-        swap(array, i, array.length - 1)
-        return array.pop()
-    } else {
-        return array.pop();
+    if (array.length > 0 && i < array.length - 1) {
+        throw new Error('cannot swap')
     }
+    return swap_remove_unchecked(array, i)
 }
 
 export function swap_remove_unchecked<T>(array: T[], i: number): Option<T> {

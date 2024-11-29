@@ -1,6 +1,7 @@
-import { type IterInputType, DoubleEndedIterator, iter, range, Range } from 'joshkaposh-iterator';
-import { IndexMap, Ord, Orderable } from './map'
-import { Option } from './util';
+import { type IterInputType, type DoubleEndedIterator, type ExactSizeDoubleEndedIterator, type Range, iter, range } from 'joshkaposh-iterator';
+import type { Option } from 'joshkaposh-option';
+import type { Ord, Orderable } from './util'
+import { IndexMap } from './map'
 import { Difference, Intersection, SymmetricDifference, Union, Drain, Splice } from './iter';
 
 export type Unit = null;
@@ -211,19 +212,19 @@ export class IndexSet<T = Ord> {
         return [index, res === null];
     }
 
-    keys(): DoubleEndedIterator<T> {
+    keys(): ExactSizeDoubleEndedIterator<T> {
         return this.#map.keys()
     }
 
-    values(): DoubleEndedIterator<T> {
+    values(): ExactSizeDoubleEndedIterator<T> {
         return this.#map.keys()
     }
 
     entries(): DoubleEndedIterator<[T, Unit]> {
-        return this.#map.as_entries()
+        return this.#map.entries()
     }
 
-    iter(): DoubleEndedIterator<T> {
+    iter(): ExactSizeDoubleEndedIterator<T> {
         return this.#map.keys();
     }
 

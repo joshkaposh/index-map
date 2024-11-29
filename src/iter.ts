@@ -1,6 +1,7 @@
-import { done, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, iter, Iterator, IterInputType, Range, SizeHint } from 'joshkaposh-iterator';
-import { Bucket, IndexMap, IndexSet, Orderable } from ".";
-import { Option } from 'joshkaposh-option';
+import { type IterInputType, type SizeHint, done, iter, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, Iterator, Range, item } from 'joshkaposh-iterator';
+import { type Bucket, IndexMap, IndexSet } from ".";
+import type { Orderable } from './util';
+import type { Option } from 'joshkaposh-option';
 
 export class Intersection<T> extends DoubleEndedIterator<T> {
     #iter: DoubleEndedIterator<T>;
@@ -20,7 +21,7 @@ export class Intersection<T> extends DoubleEndedIterator<T> {
         let n;
         while (!(n = this.#iter.next()).done) {
             if (this.#other.contains(n.value)) {
-                return { done: false, value: n.value }
+                return item(n.value);
             }
         }
         return done()
@@ -30,7 +31,7 @@ export class Intersection<T> extends DoubleEndedIterator<T> {
         let n;
         while (!(n = this.#iter.next_back()).done) {
             if (this.#other.contains(n.value)) {
-                return { done: false, value: n.value }
+                return item(n.value)
             }
         }
         return done()
@@ -93,7 +94,7 @@ export class Difference<T> extends DoubleEndedIterator<T> {
         let n
         while (!(n = this.#iter.next()).done) {
             if (!this.#other.contains(n.value)) {
-                return { done: false, value: n.value }
+                return item(n.value)
             }
         }
         return done()
@@ -103,7 +104,7 @@ export class Difference<T> extends DoubleEndedIterator<T> {
         let n
         while (!(n = this.#iter.next_back()).done) {
             if (!this.#other.contains(n.value)) {
-                return { done: false, value: n.value }
+                return item(n.value)
             }
         }
         return done()
@@ -172,10 +173,10 @@ export class Drain<K, V> extends ExactSizeIterator<[K, V]> {
             return done()
         } else {
             const index = ni.value - this.#taken.length;
-            const elt = this.#map.get_index_entry(index)!;
-            this.#taken.push(elt[1]);
-            this.#map.shift_remove(elt[0]);
-            return { done: false, value: [elt[0], elt[1]] }
+            const [k, v] = this.#map.get_index_entry(index)!;
+            this.#taken.push(v);
+            this.#map.shift_remove(k);
+            return item<[K, V]>([k, v])
         }
     }
 
@@ -218,7 +219,7 @@ export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
         }
         this.#map.set(k, [i, v]);
 
-        return { done: false, value: [old_key, old_val] };
+        return item<[K, V]>([old_key, old_val]);
     }
 
     override next(): IteratorResult<[K, V]> {
