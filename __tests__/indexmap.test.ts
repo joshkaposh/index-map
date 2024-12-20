@@ -11,6 +11,38 @@ function insert(map: IndexMap<string, string>, k: number, v: number) {
     map.insert(`key-${k}`, `value-${v}`);
 }
 
+class Something {
+    constructor(public value: string) { }
+    eq(other: Something) {
+        return other.value === this.value;
+    }
+
+    to_primitive() {
+        return this.value;
+    }
+
+    [Symbol.toPrimitive]() {
+        return this.to_primitive();
+    }
+}
+
+test('hasher', () => {
+    const m = IndexMap.with_hasher<Something, number>((k) => k.to_primitive());
+    m.insert(new Something('a'), 0);
+    m.insert(new Something('b'), 1000);
+    m.insert(new Something('c'), 2);
+
+    assert(m.len() === 3);
+    assert(m.get(new Something('a')) === 0)
+    m.insert(new Something('a'), 25);
+    // assert(m.get(new Something('a')) === 0)
+
+
+    // m.swap_remove(new Something('a'))
+    // m.shift_insert(0, 'd', 3)
+
+})
+
 test('retain', () => {
     const map = new IndexMap<number, number>();
 
