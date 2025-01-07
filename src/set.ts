@@ -1,18 +1,15 @@
-import { type IterInputType, type DoubleEndedIterator, type ExactSizeDoubleEndedIterator, type Range, iter, range } from 'joshkaposh-iterator';
+import { type IterInputType, type DoubleEndedIterator, type ExactSizeDoubleEndedIterator, type Range, iter } from 'joshkaposh-iterator';
 import type { Option } from 'joshkaposh-option';
 import type { Ord, Orderable } from './util'
 import { IndexMap } from './map'
 import { Difference, Intersection, SymmetricDifference, Union, Drain, Splice } from './iter';
 
-export type Unit = null;
-export const unit = null;
-
 export class IndexSet<T = Ord> {
-    #map: IndexMap<Orderable<T>, Unit>;
-    constructor(map?: IndexMap<Orderable<T>, Unit>)
+    #map: IndexMap<Orderable<T>, null>;
+    constructor(map?: IndexMap<Orderable<T>, null>)
     constructor(iterable?: IterInputType<T>)
-    constructor(map: IndexMap<Orderable<T>, Unit> | IterInputType<T> = new IndexMap()) {
-        map = (map instanceof IndexMap ? map : new IndexMap(iter(map).map(x => [x, unit] as [Orderable<T>, Unit])))
+    constructor(map: IndexMap<Orderable<T>, null> | IterInputType<T> = new IndexMap()) {
+        map = (map instanceof IndexMap ? map : new IndexMap(iter(map).map(x => [x, null] as [Orderable<T>, null])))
         this.#map = map;
     }
 
@@ -21,7 +18,7 @@ export class IndexSet<T = Ord> {
     }
 
     append(other: IndexSet<T>): void {
-        other.drain(range(0, other.len())).for_each(([x]) => this.insert(x as Orderable<T>))
+        other.drain(0, other.len()).for_each(([x]) => this.insert(x as Orderable<T>))
     }
 
     clear() {
@@ -106,14 +103,14 @@ export class IndexSet<T = Ord> {
     }
 
     shift_insert(index: number, x: T): Option<T> {
-        return this.#map.shift_insert(index, x as Orderable<T>, unit);
+        return this.#map.shift_insert(index, x as Orderable<T>, null);
     }
 
     shift_remove(x: T): Option<T> {
         return this.#map.shift_remove(x as Orderable<T>)
     }
 
-    shift_remove_full(x: T): Option<[number, T, Unit]> {
+    shift_remove_full(x: T): Option<[number, T, null]> {
         return this.#map.shift_remove_full(x as Orderable<T>)
     }
 
@@ -140,8 +137,8 @@ export class IndexSet<T = Ord> {
         return this.#map.is_sorted();
     }
 
-    splice(range: Range, replace_with: IterInputType<[T, Unit]>): Splice<T, Unit> {
-        return this.#map.splice(range, replace_with as IterInputType<[Orderable<T>, Unit]>)
+    splice(start: number, end: number, replace_with: IterInputType<[T, null]>): Splice<T, null> {
+        return this.#map.splice(start, end, replace_with as IterInputType<[Orderable<T>, null]>)
     }
 
     split_off(at: number): IndexSet<T> {
@@ -156,7 +153,7 @@ export class IndexSet<T = Ord> {
         return this.#map.swap_remove(x as Orderable<T>)
     }
 
-    swap_remove_full(x: T): Option<[number, T, Unit]> {
+    swap_remove_full(x: T): Option<[number, T, null]> {
         return this.#map.swap_remove_full(x as Orderable<T>)
 
     }
@@ -175,15 +172,15 @@ export class IndexSet<T = Ord> {
         this.#map.truncate(new_len);
     }
 
-    drain(range: Range): Drain<T, Unit> {
-        return new Drain(range, this.#map)
+    drain(from: number, to: number): Drain<T, null> {
+        return new Drain(from, to, this.#map)
     }
 
     get(x: T): Option<T> {
         return this.#map.get(x as Orderable<T>)
     }
 
-    get_full(x: T): Option<[number, T, Unit]> {
+    get_full(x: T): Option<[number, T, null]> {
         return this.#map.get_full(x as Orderable<T>)
     }
 
@@ -200,11 +197,11 @@ export class IndexSet<T = Ord> {
     }
 
     insert(value: Orderable<T>): Option<T> {
-        return this.#map.insert(value, unit);
+        return this.#map.insert(value, null);
     }
 
     insert_full(value: Orderable<T>): [number, Option<T>] {
-        return this.#map.insert_full(value, unit);
+        return this.#map.insert_full(value, null);
     }
 
     insert_before(index: number, value: Orderable<T>): [number, boolean] {
@@ -220,7 +217,7 @@ export class IndexSet<T = Ord> {
         return this.#map.keys()
     }
 
-    entries(): DoubleEndedIterator<[T, Unit]> {
+    entries(): DoubleEndedIterator<[T, null]> {
         return this.#map.entries()
     }
 

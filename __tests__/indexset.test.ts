@@ -2,7 +2,6 @@ import { test, expect, assert } from 'vitest'
 import { IndexSet } from '../src/index';
 
 test('difference', () => {
-
     const s1 = new IndexSet([1, 2, 3, 4])
     const s2 = new IndexSet([3, 4, 5, 6])
 

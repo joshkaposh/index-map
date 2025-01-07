@@ -1,2 +1,2 @@
-export * from './map';
-export * from './set';
+export { IndexMap } from './map';
+export { IndexSet } from './set';

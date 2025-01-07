@@ -35,11 +35,6 @@ test('hasher', () => {
     assert(m.len() === 3);
     assert(m.get(new Something('a')) === 0)
     m.insert(new Something('a'), 25);
-    // assert(m.get(new Something('a')) === 0)
-
-
-    // m.swap_remove(new Something('a'))
-    // m.shift_insert(0, 'd', 3)
 
 })
 
@@ -60,7 +55,7 @@ test('sort', () => {
     const s = new IndexMap([[1, 1], [0, 1], [5, 4], [2, 1]]);
 
     s.sort_keys();
-    expect(s.as_array()).toEqual(expected);
+    expect(s.toArray()).toEqual(expected);
     s.sort_by((k1, v1, k2, v2) => {
         if (k1 < k2) {
             return 1
@@ -70,7 +65,7 @@ test('sort', () => {
             return -1
         }
     })
-    expect(s.as_array()).toEqual(iter(expected).rev().collect());
+    expect(s.toArray()).toEqual(iter(expected).rev().collect());
     assert(s.is_sorted())
 })
 
@@ -261,7 +256,7 @@ test('drain', () => {
     map.insert('D', null)
     map.insert('E', null)
 
-    assert(map.drain(range(0, map.len())).count() === 5)
+    assert(map.drain(0, map.len()).count() === 5)
     assert(map.len() === 0);
 })
 
@@ -273,7 +268,7 @@ test('splice', () => {
         map.insert(i, null)
     }
 
-    let removed = map.splice(range(0, count), map.as_array().reverse())
+    let removed = map.splice(0, count, map.toArray().reverse())
     let i = -1
     let expected = count + 1;
     for (const [k] of removed) {

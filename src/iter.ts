@@ -1,5 +1,6 @@
-import { type IterInputType, type SizeHint, done, iter, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, Iterator, Range, item } from 'joshkaposh-iterator';
-import { type Bucket, IndexMap, IndexSet } from ".";
+import { type IterInputType, type SizeHint, type Iterator, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, done, iter, item, } from 'joshkaposh-iterator';
+import type { IndexSet } from "./set";
+import type { Bucket, IndexMap } from './map';
 import type { Orderable } from './util';
 import type { Option } from 'joshkaposh-option';
 
@@ -153,10 +154,12 @@ export class SymmetricDifference<T> extends DoubleEndedIterator<T> {
 export class Drain<K, V> extends ExactSizeIterator<[K, V]> {
     #map: IndexMap<Orderable<K>, V>;
     #taken: V[];
-    #r: Range;
-    constructor(range: Range, map: IndexMap<Orderable<K>, V>) {
+    #start: number;
+    #end: number;
+    constructor(start: number, end: number, map: IndexMap<Orderable<K>, V>) {
         super();
-        this.#r = range;
+        this.#start = start - 1;
+        this.#end = end;
         this.#map = map;
         this.#taken = []
     }
@@ -167,15 +170,17 @@ export class Drain<K, V> extends ExactSizeIterator<[K, V]> {
     }
 
     next(): IteratorResult<[K, V]> {
-        const ni = this.#r.next();
-
-        if (ni.done) {
-            return done()
+        this.#start++;
+        const start = this.#start;
+        const end = this.#end;
+        if (start >= end) {
+            return done();
         } else {
-            const index = ni.value - this.#taken.length;
+            const index = start - this.#taken.length;
             const [k, v] = this.#map.get_index_entry(index)!;
             this.#taken.push(v);
             this.#map.shift_remove(k);
+
             return item<[K, V]>([k, v])
         }
     }
@@ -183,10 +188,15 @@ export class Drain<K, V> extends ExactSizeIterator<[K, V]> {
     override size_hint(): SizeHint<number, number> {
         return [0, this.#map.len() - this.#taken.length]
     }
+
+    [Symbol.dispose]() {
+        for (const _ of this) { }
+    }
 }
 
 export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
-    #r: Range;
+    #start: number;
+    #end: number;
     #replace: Iterator<[K, V]>
     #map: Map<K, Bucket<V>>;
     #indices: K[];
@@ -194,11 +204,18 @@ export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
     #front: number;
     #back: number;
 
-    constructor(map: Map<K, Bucket<V>>, indices: K[], range: Range, replace_with: IterInputType<[K, V]>) {
+    constructor(
+        map: Map<K, Bucket<V>>,
+        indices: K[],
+        start: number,
+        end: number,
+        replace_with: IterInputType<[K, V]>
+    ) {
         super();
         this.#map = map;
         this.#indices = indices
-        this.#r = range;
+        this.#start = start - 1;
+        this.#end = end;
         this.#replace = iter(replace_with);
 
         this.#front = -1;
@@ -228,15 +245,15 @@ export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
             return done()
         }
 
-        const nexti = this.#r.next();
+        this.#start++;
+        const nexti = this.#start;
         const nextkv = this.#replace.next();
-        if (nexti.done || nextkv.done) {
+        if (nexti > this.#end || nextkv.done) {
             return done();
         }
 
-        const i = nexti.value;
         const [k, v] = nextkv.value;
-        return this.#splice(i, k, v);
+        return this.#splice(nexti, k, v);
     }
 
     override next_back(): IteratorResult<[K, V]> {
@@ -245,16 +262,16 @@ export class Splice<K, V> extends ExactSizeDoubleEndedIterator<[K, V]> {
             return done()
         }
 
-        const nexti = this.#r.next_back();
+        this.#start++;
+        const nexti = this.#start;
         const nextkv = this.#replace.next();
 
-        if (nexti.done || nextkv.done) {
+        if (nexti > this.#end || nextkv.done) {
             return done();
         }
 
-        const i = nexti.value;
         const [k, v] = nextkv.value;
-        return this.#splice(i, k, v);
+        return this.#splice(nexti, k, v);
     }
 
 }

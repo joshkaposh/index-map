@@ -2,9 +2,9 @@ import { is_some, Option } from "joshkaposh-option";
 
 export type Orderable<T> = T extends Ord ? T : never
 
-export type Ord = Option<(string) & string | (boolean) & boolean | (number) & number | {
+export type Ord = Option<(string | boolean | number | {
     [Symbol.toPrimitive](): string;
-}> & {}
+}) & {}>
 
 /**
  * @description

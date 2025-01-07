@@ -1,7 +1,7 @@
 import { type DoubleEndedIterator, type ExactSizeDoubleEndedIterator, type IterInputType, type Iterator, type Range, iter, range } from "joshkaposh-iterator";
 import { type Ord, swap, swap_2 } from "./util";
 import { Drain, Splice } from "./iter";
-import { type Option, is_none, is_some } from "joshkaposh-option";
+import { type Option, is_some } from "joshkaposh-option";
 
 
 function oob(index: number, bounds: number) {
@@ -59,17 +59,28 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         return new IndexMap(new Map(entries), indices);
     }
 
+    keys(): ExactSizeDoubleEndedIterator<K> {
+        return iter(this.#indices);
+    }
 
-    as_array(): [K, V][] {
-        return this.entries().collect();
+    values(): DoubleEndedIterator<V> {
+        return this.iter().map(([_, v]) => v);
     }
 
     entries(): DoubleEndedIterator<[K, V]> {
         return iter(this.#indices).map((k) => {
-            const v = this.#map.get(k)![VALUE];
+            const v = this.#map.get(this.#hash(k))![VALUE];
             return [k, v]
         })
 
+    }
+
+    toArray(): [K, V][] {
+        return this.entries().collect();
+    }
+
+    iter(): DoubleEndedIterator<[K, V]> {
+        return this.entries();
     }
 
     clear(): void {
@@ -81,8 +92,8 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         return this.#map.has(this.#hash(key));
     }
 
-    drain(r: Range): Drain<K, V> {
-        return new Drain(r, this);
+    drain(start: number, end: number): Drain<K, V> {
+        return new Drain(start, end, this);
     }
 
     first(): Option<V> {
@@ -92,12 +103,12 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     }
 
     get(key: K): Option<V> {
-        const bucket = this.#get_unchecked(key);
+        const bucket = this.#map.get(this.#hash(key));
         return bucket ? bucket[1] : undefined;
     }
 
     get_full(key: K): Option<Entry<K, V>> {
-        const v = this.#get_unchecked(key)!;
+        const v = this.#map.get(this.#hash(key));
         if (!v) {
             return
         }
@@ -126,7 +137,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
      * Gets the index of the key if one is present.
      */
     get_index_of(key: K): Option<number> {
-        const bucket = this.#get_unchecked(key);
+        const bucket = this.#map.get(this.#hash(key));
         return bucket ? bucket[INDEX] : undefined;
     }
 
@@ -134,7 +145,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
      * Returns the key-value pair if one was found
      */
     get_key_value(key: K): Option<[K, V]> {
-        const bucket = this.#get_unchecked(key);
+        const bucket = this.#map.get(this.#hash(key));
         return bucket ? [key, bucket[VALUE]] : undefined;
     }
 
@@ -151,6 +162,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
      * Inserts the key-value pair into the Map and returns the old value is one was present.
      */
     insert(key: K, value: V): Option<V> {
+        const old_key = key;
         key = this.#hash(key)
         const bucket = this.#map.get(key);
         if (bucket) {
@@ -159,7 +171,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
             return old_val;
         }
         this.#map.set(key, [this.len(), value]);
-        this.#indices.push(key);
+        this.#indices.push(old_key);
         return undefined;
     }
 
@@ -168,7 +180,9 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
      *  or the current index-value pair if a new insert.
      */
     insert_full(key: K, value: V): [number, Option<V>] {
+        const old_key = key;
         key = this.#hash(key);
+
         const bucket = this.#map.get(key);
         if (bucket) {
             const old_val = bucket[VALUE]
@@ -177,7 +191,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         }
         const idx = this.len()
         this.#map.set(key, [idx, value]);
-        this.#indices.push(key);
+        this.#indices.push(old_key);
         return [idx, null];
     }
 
@@ -203,6 +217,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     is_sorted(): boolean {
         let calls = 0;
         this.sort_by((a, _, b) => {
+            // @ts-expect-error
             if (a > b) {
                 calls++;
                 return 0
@@ -213,15 +228,6 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
             }
         })
         return calls === 0
-    }
-
-
-    iter(): DoubleEndedIterator<[K, V]> {
-        return this.entries();
-    }
-
-    keys(): ExactSizeDoubleEndedIterator<K> {
-        return iter(this.#indices);
     }
 
     last(): Option<V> {
@@ -246,7 +252,6 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
                 return;
             }
             this.#shift_down(from, to)
-
         }
     }
 
@@ -300,13 +305,13 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
 
         const bucket = this.get_full(key);
         if (bucket) {
-            const oldval = bucket[2]
-            bucket[2] = value
+            const oldval = bucket[2];
+            bucket[2] = value;
             this.move_index(bucket[INDEX], index);
             return oldval;
         } else {
-            key = this.#hash(key);
             this.#indices.splice(index, 0, key);
+            key = this.#hash(key);
             this.#map.set(key, [index, value]);
             this.#sync_indices(index);
             return undefined;
@@ -314,32 +319,32 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     }
 
     shift_remove(key: K): Option<V> {
-        key = this.#hash(key);
-        const v = this.#map.get(key);
-        if (is_none(v)) {
+        const hash = this.#hash(key);
+        const bucket = this.#map.get(hash);
+        if (!bucket) {
             return
         }
-        return this.#shift_remove_full_unchecked(v[0], key, v[1])[2];
+        return this.#shift_remove_full_unchecked(bucket[0], hash, bucket[1])[2];
     }
 
     shift_remove_entry(key: K): Option<[K, V]> {
-        key = this.#hash(key);
-        const item = this.#map.get(key);
+        const hash = this.#hash(key);
+        const item = this.#map.get(hash);
         if (!item) {
             return undefined
         }
         const [i, v] = item;
-        this.#shift_remove_full_unchecked(i, key, v);
+        this.#shift_remove_full_unchecked(i, hash, v);
         return [key, v];
     }
 
     shift_remove_full(key: K): Option<Entry<K, V>> {
-        key = this.#hash(key);
-        const item = this.#map.get(key);
-        if (!item) {
+        const hash = this.#hash(key);
+        const bucket = this.#map.get(hash)
+        if (!bucket) {
             return
         }
-        const [index, value] = item
+        const [index, value] = bucket;
         return this.#shift_remove_full_unchecked(index, key, value);
     }
 
@@ -359,13 +364,23 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     }
 
     sort_keys() {
-        this.#indices.sort();
+        this.#indices.sort((a, b) => {
+            const hA = this.#hash(a)
+            const hB = this.#hash(b);
+            if (hA < hB) {
+                return -1
+            } else if (hA > hB) {
+                return 1;
+            } else {
+                return 0
+            }
+        });
         // sync indices in buckets
         this.#sync_indices();
     }
 
-    splice(range: Range, replace_with: IterInputType<[K, V]>): Splice<K, V> {
-        return new Splice(this.#map, this.#indices, range, iter(replace_with).map(([k, v]) => [this.#hash(k), v]))
+    splice(from: number, to: number, replace_with: IterInputType<[K, V]>): Splice<K, V> {
+        return new Splice(this.#map, this.#indices, from, to, iter(replace_with).map(([k, v]) => [this.#hash(k), v]))
     }
 
     split_off(at: number): IndexMap<K, V, S> {
@@ -422,8 +437,11 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     }
 
     swap_remove_index(index: number): Option<V> {
+        if (this.#indices.length === 0 || index < 0 || index >= this.#indices.length) {
+            return
+        }
         const k = this.#indices[index];
-        return is_some(k) ? this.swap_remove(k) : undefined;
+        return this.swap_remove(k);
     }
 
     truncate(new_len: number) {
@@ -434,10 +452,6 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         while (this.#indices.length > new_len) {
             this.pop();
         }
-    }
-
-    values(): DoubleEndedIterator<V> {
-        return this.iter().map(([_, v]) => v);
     }
 
     #remove_shift_indices(index: number) {
@@ -454,15 +468,11 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         }
     }
 
-    #get_unchecked(key: K): Option<[number, V]> {
-        return this.#map.get(this.#hash(key));
-    }
-
-    #shift_remove_full_unchecked(index: number, key: K, value: V): Entry<K, V> {
-        this.#map.delete(key);
-        this.#indices.splice(index, 1);
+    #shift_remove_full_unchecked(index: number, hash: K, value: V): Entry<K, V> {
+        this.#map.delete(hash);
+        hash = this.#indices.splice(index, 1)[0];
         this.#remove_shift_indices(index);
-        return [index, key, value];
+        return [index, hash, value];
     }
 
     #shift_up(from: number, to: number) {
