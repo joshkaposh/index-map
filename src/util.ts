@@ -21,27 +21,6 @@ export function swap<T>(array: T[], from_index: number, to_index: number) {
     array[from_index] = temp;
 }
 
-/**
- * @description
- * Performs a swap operation at `index` for two arrays.
- * 
- * `swap_2` does nothing if `index` >= `src.length` or `target.length`.
- * @example
- * const a = ['a', 'b'];
- * const b = ['c', 'd'];
- * swap_2(a, b, 0);
- * console.log(a); // ['c', 'b']
- * console.log(b); // ['a', 'd'] 
- */
-export function swap_2<T>(src: T[], target: T[], index: number) {
-    if (index >= src.length || index >= target.length) {
-        return;
-    }
-    const temp = target[index];
-    target[index] = src[index];
-    src[index] = temp;
-}
-
 export function swap_remove<T>(array: T[], i: number): Option<T> {
     if (array.length > 0 && i < array.length - 1) {
         throw new Error('cannot swap')

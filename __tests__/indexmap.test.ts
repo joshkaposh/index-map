@@ -12,13 +12,16 @@ function insert(map: IndexMap<string, string>, k: number, v: number) {
 }
 
 class Something {
-    constructor(public value: string) { }
+    #is_system: boolean
+    constructor(public index: number, is_system: boolean) {
+        this.#is_system = is_system;
+    }
     eq(other: Something) {
-        return other.value === this.value;
+        return this.index === other.index;
     }
 
     to_primitive() {
-        return this.value;
+        return `${this.index} ${this.#is_system}`;
     }
 
     [Symbol.toPrimitive]() {
@@ -27,15 +30,62 @@ class Something {
 }
 
 test('hasher', () => {
-    const m = IndexMap.with_hasher<Something, number>((k) => k.to_primitive());
-    m.insert(new Something('a'), 0);
-    m.insert(new Something('b'), 1000);
-    m.insert(new Something('c'), 2);
+    const m = IndexMap.with_hasher<Something, number>((k) => {
+        console.log('hashing key', k, k.to_primitive());
+        return k.to_primitive()
+    });
+    m.insert(new Something(0, true), 0);
+    m.insert(new Something(0, false), 1000);
+    m.insert(new Something(1, false), 2);
 
     assert(m.len() === 3);
-    assert(m.get(new Something('a')) === 0)
-    m.insert(new Something('a'), 25);
+    assert(m.get_index_of(new Something(0, true)) === 0);
+    assert(m.get_index_of(new Something(0, false)) === 1);
+    assert(m.get_index_of(new Something(1, false)) === 2);
 
+    assert(m.get(new Something(0, true)) === 0)
+    expect(m.insert(new Something(0, true), 25)).toEqual(0);
+    expect(m.get(new Something(0, true))).toEqual(25);
+
+    assert(is_some(m.get_index_of(new Something(0, true))));
+    assert(is_some(m.get_index_of(new Something(0, false))));
+    assert(!is_some(m.get_index_of(new Something(1, true))));
+    assert(is_some(m.get_index_of(new Something(1, false))));
+
+})
+
+test('hasher_swap_remove', () => {
+    const m = IndexMap.with_hasher<Something, string>((k) => {
+        return k.to_primitive()
+    });
+    m.insert(new Something(1, true), 'a');
+    m.insert(new Something(2, true), 'b');
+    m.insert(new Something(3, true), 'c');
+    m.insert(new Something(4, true), 'd');
+
+    assert(!!(m.swap_remove(new Something(1, true))));
+    expect(m.keys().collect()).toEqual([
+        new Something(4, true),
+        new Something(2, true),
+        new Something(3, true),
+    ])
+
+    assert(!!(m.swap_remove(new Something(4, true))));
+    expect(m.keys().collect()).toEqual([
+        new Something(3, true),
+        new Something(2, true),
+    ])
+
+    assert(!!(m.swap_remove(new Something(2, true))));
+    expect(m.keys().collect()).toEqual([
+        new Something(3, true),
+    ])
+
+
+    assert(!!(m.swap_remove(new Something(3, true))));
+    expect(m.keys().collect()).toEqual([])
+
+    assert(m.len() === 0);
 })
 
 test('retain', () => {
