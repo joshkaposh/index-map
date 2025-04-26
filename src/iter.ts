@@ -1,10 +1,10 @@
 import { type IterInputType, type SizeHint, type Iterator, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, done, iter, item, } from 'joshkaposh-iterator';
 import type { IndexSet } from "./set";
 import type { Bucket, IndexMap } from './map';
-import type { Orderable } from './util';
+import type { Ord, Orderable } from './util';
 import type { Option } from 'joshkaposh-option';
 
-export class Intersection<T> extends DoubleEndedIterator<T> {
+export class Intersection<T extends Ord> extends DoubleEndedIterator<T> {
     #iter: DoubleEndedIterator<T>;
     #other: IndexSet<T>
     constructor(a: IndexSet<T>, b: IndexSet<T>) {
@@ -21,7 +21,7 @@ export class Intersection<T> extends DoubleEndedIterator<T> {
     override next(): IteratorResult<T, any> {
         let n;
         while (!(n = this.#iter.next()).done) {
-            if (this.#other.contains(n.value)) {
+            if (this.#other.has(n.value)) {
                 return item(n.value);
             }
         }
@@ -31,7 +31,7 @@ export class Intersection<T> extends DoubleEndedIterator<T> {
     override next_back(): IteratorResult<T, any> {
         let n;
         while (!(n = this.#iter.next_back()).done) {
-            if (this.#other.contains(n.value)) {
+            if (this.#other.has(n.value)) {
                 return item(n.value)
             }
         }
@@ -43,7 +43,7 @@ export class Intersection<T> extends DoubleEndedIterator<T> {
     }
 }
 
-export class Union<T> extends DoubleEndedIterator<T> {
+export class Union<T extends Ord> extends DoubleEndedIterator<T> {
     #iter: DoubleEndedIterator<T>
     constructor(a: IndexSet<T>, b: IndexSet<T>) {
         super()
@@ -76,7 +76,7 @@ export class Union<T> extends DoubleEndedIterator<T> {
     }
 }
 
-export class Difference<T> extends DoubleEndedIterator<T> {
+export class Difference<T extends Ord> extends DoubleEndedIterator<T> {
     #iter: DoubleEndedIterator<T>;
     #other: IndexSet<T>;
     constructor(a: IndexSet<T>, b: IndexSet<T>) {
@@ -94,7 +94,7 @@ export class Difference<T> extends DoubleEndedIterator<T> {
     override next(): IteratorResult<T, any> {
         let n
         while (!(n = this.#iter.next()).done) {
-            if (!this.#other.contains(n.value)) {
+            if (!this.#other.has(n.value)) {
                 return item(n.value)
             }
         }
@@ -104,7 +104,7 @@ export class Difference<T> extends DoubleEndedIterator<T> {
     override next_back(): IteratorResult<T, any> {
         let n
         while (!(n = this.#iter.next_back()).done) {
-            if (!this.#other.contains(n.value)) {
+            if (!this.#other.has(n.value)) {
                 return item(n.value)
             }
         }
@@ -116,7 +116,7 @@ export class Difference<T> extends DoubleEndedIterator<T> {
     }
 }
 
-export class SymmetricDifference<T> extends DoubleEndedIterator<T> {
+export class SymmetricDifference<T extends Ord> extends DoubleEndedIterator<T> {
     #iter: DoubleEndedIterator<T>;
     constructor(a: IndexSet<T>, b: IndexSet<T>) {
         super()
@@ -177,16 +177,16 @@ export class Drain<K, V> extends ExactSizeIterator<[K, V]> {
             return done();
         } else {
             const index = start - this.#taken.length;
-            const [k, v] = this.#map.get_index_entry(index)!;
+            const [k, v] = this.#map.getIndexEntry(index)!;
             this.#taken.push(v);
-            this.#map.shift_remove(k);
+            this.#map.delete(k);
 
             return item<[K, V]>([k, v])
         }
     }
 
     override size_hint(): SizeHint<number, number> {
-        return [0, this.#map.len() - this.#taken.length]
+        return [0, this.#map.size - this.#taken.length]
     }
 
     [Symbol.dispose]() {

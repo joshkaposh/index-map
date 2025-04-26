@@ -7,7 +7,7 @@ test('difference', () => {
 
     expect(s1.difference(s2).collect()).toEqual([1, 2]);
     expect(s2.difference(s1).collect()).toEqual([5, 6]);
-    expect(s1.symmetric_difference(s2).collect()).toEqual([1, 2, 5, 6])
+    expect(s1.symmetricDifference(s2).collect()).toEqual([1, 2, 5, 6])
     expect(s1.union(s2).collect()).toEqual([1, 2, 3, 4, 5, 6]);
 })
 
@@ -16,62 +16,63 @@ test('indexset', () => {
     const s1 = new IndexSet<number>()
     const s2 = new IndexSet<number>();
 
-    s1.insert(0);
-    s1.insert(1);
+    s1.add(0);
+    s1.add(1);
 
-    s2.insert(4)
-    s2.insert(5)
+    s2.add(4);
+    s2.add(5);
 
-    s1.append(s2);
+    const s3 = s1.append(s2);
 
-    expect(s1.values().collect()).toEqual([0, 1, 4, 5]);
-    expect(s2.values().collect()).toEqual([]);
+    expect(s1.keys().collect()).toEqual([0, 1]);
+    expect(s2.keys().collect()).toEqual([4, 5]);
+    expect(s3.keys().collect()).toEqual([0, 1, 4, 5]);
 })
 
-test('is_subset_superset', () => {
+test('isSubset_superset', () => {
     const a = new IndexSet();
     const b = new IndexSet();
 
-    a.insert(1)
-    a.insert(2)
-    a.insert(3)
+    a.add(1)
+    a.add(2)
+    a.add(3)
 
-    assert(a.is_superset(b))
-    assert(b.is_subset(a))
+    assert(a.isSuperset(b))
+    assert(b.isSubset(a))
 
-    b.insert(1)
-    assert(b.is_subset(a))
-    b.insert(2)
-    assert(b.is_subset(a))
-    b.insert(3)
-    assert(b.is_subset(a))
+    b.add(1)
+    assert(b.isSubset(a))
+    b.add(2)
+    assert(b.isSubset(a))
+    b.add(3)
+    assert(b.isSubset(a))
 
-    assert(a.is_superset(b) === b.is_superset(a))
-    b.insert(4);
-    assert(!a.is_superset(b))
-    assert(b.is_superset(a))
-    assert(!b.is_subset(a) === a.is_subset(b))
+    assert(a.isSuperset(b) === b.isSuperset(a))
+    b.add(4);
+    assert(!a.isSuperset(b))
+    assert(b.isSuperset(a))
+    assert(!b.isSubset(a) === a.isSubset(b))
 })
 
-test('is_disjoint', () => {
+test('isDisjoint', () => {
     const a = new IndexSet();
     const b = new IndexSet();
-    a.insert(1);
-    a.insert(2);
-    a.insert(3);
+    a.add(1);
+    a.add(2);
+    a.add(3);
 
-    assert(a.is_disjoint(b))
-    b.insert(1);
-    assert(!a.is_disjoint(b))
-    a.remove(1);
-    assert(a.is_disjoint(b))
-    b.insert(2);
-    assert(!a.is_disjoint(b))
+    assert(a.isDisjoint(b))
+    b.add(1);
+    assert(!a.isDisjoint(b))
+    a.delete(1);
+    assert(a.isDisjoint(b))
+    b.add(2);
+    assert(!a.isDisjoint(b))
 })
 
 test('retain', () => {
     const set = new IndexSet([1, 2, 3, 4, 5]);
     set.retain(v => v % 2 === 0);
     expect(set.iter().collect()).toEqual([2, 4]);
-    assert(set.len() === 2);
+    assert(set.size === 2);
 })

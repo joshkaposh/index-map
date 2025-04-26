@@ -1,68 +1,97 @@
-import { type IterInputType, type DoubleEndedIterator, type ExactSizeDoubleEndedIterator, type Range, iter } from 'joshkaposh-iterator';
+import { type IterInputType, type DoubleEndedIterator, type ExactSizeDoubleEndedIterator, iter } from 'joshkaposh-iterator';
 import type { Option } from 'joshkaposh-option';
-import type { Ord, Orderable } from './util'
-import { IndexMap } from './map'
+import { type Ord, type Orderable, type DefaultHasher, type Hasher, IndexMap } from './map'
 import { Difference, Intersection, SymmetricDifference, Union, Drain, Splice } from './iter';
 
-export class IndexSet<T = Ord> {
-    #map: IndexMap<Orderable<T>, null>;
-    constructor(map?: IndexMap<Orderable<T>, null>)
+export class IndexSet<
+    T extends any,
+    S extends Hasher<Orderable<T>, any> = DefaultHasher<Orderable<T>>
+> {
+    #map: IndexMap<Orderable<T>, Orderable<T>>;
+    constructor(map?: IndexMap<Ord, Orderable<T>>)
     constructor(iterable?: IterInputType<T>)
-    constructor(map: IndexMap<Orderable<T>, null> | IterInputType<T> = new IndexMap()) {
-        map = (map instanceof IndexMap ? map : new IndexMap(iter(map).map(x => [x, null] as [Orderable<T>, null])))
-        this.#map = map;
+    constructor(map: IndexMap<Orderable<T>, Orderable<T>> | IterInputType<T> = new IndexMap<Orderable<T>, Orderable<T>, S>()) {
+        this.#map = (map instanceof IndexMap ? map : new IndexMap(iter(map).map(x => [x, x] as [Orderable<T>, Orderable<T>]))) as IndexMap<Orderable<T>, Orderable<T>, S>;
     }
 
-    static with_capacity<T>(n: number): IndexSet<T> {
-        return new IndexSet(IndexMap.with_capacity(n))
+    static withCapacity<T extends Ord>(capacity: number): IndexSet<T> {
+        return new IndexSet(IndexMap.withCapacity(capacity))
     }
 
-    append(other: IndexSet<T>): void {
-        other.drain(0, other.len()).for_each(([x]) => this.insert(x as Orderable<T>))
+    static withHasher<S extends Hasher<Ord, any>>(hasher: S): IndexSet<Parameters<S>[0], S> {
+        return new IndexSet(IndexMap.withHasher(hasher))
+    }
+
+    static withCapacityAndHasher<S extends Hasher<Ord, any>>(capacity: number, hasher: S): IndexSet<Parameters<S>[0], S> {
+        return new IndexSet(IndexMap.withCapacityAndHasher(capacity, hasher))
+    }
+
+    append(other: IndexSet<T>): IndexSet<T, S> {
+        const set = IndexSet.withCapacityAndHasher(this.size, this.#map.hasher as Hasher<Ord, any>)
+        this.#map.keys().for_each(x => set.add(x));
+        other.#map.keys().for_each(x => set.add(x));
+
+        return set as unknown as IndexSet<T, S>;
+    }
+
+    extend(iterable: Iterable<T>) {
+        for (const x of iterable) {
+            this.add(x);
+        }
+        return this;
     }
 
     clear() {
         this.#map.clear();
     }
 
-    contains(x: T): boolean {
-        return this.#map.contains_key(x as Orderable<T>)
+    has(x: T): boolean {
+        return this.#map.has(x as Orderable<T>)
     }
 
-    len(): number {
-        return this.#map.len()
+    get size(): number {
+        return this.#map.size
     }
 
-    is_empty(): boolean {
-        return this.#map.is_empty()
+    get isEmpty(): boolean {
+        return this.#map.isEmpty
     }
 
-    is_disjoint(other: IndexSet<T>): boolean {
-        return !this.iter().any(x => other.contains(x))
+    /**
+     * 
+     * @returns true if and only if this `IndexSet` has no elements that are in `other`.
+     */
+    isDisjoint(other: IndexSet<T>): boolean {
+        return !this.iter().any(x => other.has(x));
     }
 
-    is_subset(other: IndexSet<T>): boolean {
-        // return true if and only if this contains only values found in other
-        return this.iter().all(x => other.contains(x))
+    /**
+     * @returns true if and only if this `IndexSet` contains only values found in `other`.
+     */
+    isSubset(other: IndexSet<T>): boolean {
+        return this.iter().all(x => other.has(x))
     }
 
-    is_superset(other: IndexSet<T>): boolean {
-        return other.is_subset(this);
+    /**
+     * @returns true if and only if `other` contains only values found in this `IndexSet`
+     */
+    isSuperset(other: IndexSet<T>): boolean {
+        return other.isSubset(this);
     }
 
     last(): Option<T> {
-        return this.#map.last()
+        return this.#map.last();
     }
 
-    move_index(from: number, to: number): void {
-        this.#map.move_index(from, to)
+    moveIndex(from: number, to: number): void {
+        this.#map.moveIndex(from, to)
     }
 
     difference(other: IndexSet<T>): DoubleEndedIterator<T> {
         return new Difference(this, other)
     }
 
-    symmetric_difference(other: IndexSet<T>): DoubleEndedIterator<T> {
+    symmetricDifference(other: IndexSet<T>): DoubleEndedIterator<T> {
         return new SymmetricDifference(this, other)
     }
 
@@ -78,147 +107,151 @@ export class IndexSet<T = Ord> {
         return this.#map.pop()
     }
 
-    remove(x: T): Option<T> {
-        return this.#map.shift_remove(x as Orderable<T>)
+    delete(x: T): boolean {
+        return this.#map.delete(x as Orderable<T>) != null
     }
 
     replace(x: T): Option<T> {
-        return this.insert(x as Orderable<T>)
+        return this.add(x)
     }
 
-    replace_full(x: T) {
-        return this.insert_full(x as Orderable<T>)
+    replaceFull(x: T) {
+        return this.addFull(x);
     }
 
     retain(keep: (x: T) => boolean) {
         this.#map.retain(keep)
     }
 
-    reverse(): void {
+    reverse() {
         this.#map.reverse();
     }
 
     shift(): Option<T> {
-        return this.#map.shift()
+        return this.#map.shiftEntry()?.[0];
     }
 
-    shift_insert(index: number, x: T): Option<T> {
-        return this.#map.shift_insert(index, x as Orderable<T>, null);
+    shiftInsert(index: number, x: T): Option<T> {
+        return this.#map.shiftInsert(index, x as Orderable<T>, x as Orderable<T>)
     }
 
-    shift_remove(x: T): Option<T> {
-        return this.#map.shift_remove(x as Orderable<T>)
+    deleteFull(x: T): Option<[number, T, T]> {
+        return this.#map.deleteFull(x as Orderable<T>);
     }
 
-    shift_remove_full(x: T): Option<[number, T, null]> {
-        return this.#map.shift_remove_full(x as Orderable<T>)
-    }
+    /**
+     * Deletes the element at `index` if one was present.
+     * @returns the element at `index` if one was present.
+     */
+    deleteIndex(index: number): Option<T> {
+        const entry = this.#map.getIndexEntry(index)
+        if (entry) {
+            this.#map.deleteIndex(index);
+            return entry[0];
+        }
 
-    shift_remove_index(index: number): Option<T> {
-        return this.#map.shift_remove_index(index)
+        return;
     }
 
     /**
      * @description Removes and returns the value in the set, if any, that is equal to the given one
      */
-    shift_take(value: T) {
-        return this.#map.shift_remove(value as Orderable<T>)
+    shiftTake(value: T): Option<T> {
+        return this.#map.deleteEntry(value as Orderable<T>)?.[0]
     }
 
     sort() {
-        this.#map.sort_keys();
+        this.#map.sortKeys();
     }
 
-    sort_by(cmp: (a: T, b: T) => -1 | 0 | 1) {
-        this.#map.sort_by((a, _, b) => cmp(a, b))
+    sortBy(cmp: (a: T, b: T) => -1 | 0 | 1) {
+        this.#map.sortBy((a, _, b) => cmp(a, b))
     }
 
-    is_sorted(): boolean {
-        return this.#map.is_sorted();
+    isSorted(): boolean {
+        return this.#map.isSorted();
     }
 
-    splice(start: number, end: number, replace_with: IterInputType<[T, null]>): Splice<T, null> {
-        return this.#map.splice(start, end, replace_with as IterInputType<[Orderable<T>, null]>)
+    splice(start: number, end: number, replace_with: IterInputType<[T, T]>): Splice<T, T> {
+        return this.#map.splice(start, end, replace_with as IterInputType<[Orderable<T>, Orderable<T>]>)
     }
 
-    split_off(at: number): IndexSet<T> {
-        return new IndexSet(this.#map.split_off(at))
+    splitOff(at: number): IndexSet<T, S> {
+        return new IndexSet(this.#map.splitOff(at)) as unknown as IndexSet<T, S>
     }
 
-    swap_indices(from: number, to: number): void {
-        this.#map.swap_indices(from, to)
+    swapIndices(from: number, to: number): void {
+        this.#map.swapIndices(from, to)
     }
 
-    swap_remove(x: T): Option<T> {
-        return this.#map.swap_remove(x as Orderable<T>)
+    swapRemove(x: T): Option<T> {
+        return this.#map.swapRemove(x as Orderable<T>)
     }
 
-    swap_remove_full(x: T): Option<[number, T, null]> {
-        return this.#map.swap_remove_full(x as Orderable<T>)
-
+    swapRemoveFull(x: T): Option<[number, T, T]> {
+        return this.#map.swapRemoveFull(x as Orderable<T>)
     }
 
-    swap_remove_index(index: number): Option<T> {
-        return this.#map.swap_remove_index(index)
-
+    swapRemoveIndex(index: number): Option<T> {
+        return this.#map.swapRemoveIndex(index)
     }
 
-    swap_take(value: T): Option<T> {
-        const entry = this.#map.swap_remove_entry(value as Orderable<T>);
+    swapTake(value: T): Option<T> {
+        const entry = this.#map.swapRemoveEntry(value as Orderable<T>);
         return entry ? entry[0] : undefined
     }
 
-    truncate(new_len: number) {
-        this.#map.truncate(new_len);
+    truncate(new_length: number) {
+        this.#map.truncate(new_length);
     }
 
-    drain(from: number, to: number): Drain<T, null> {
-        return new Drain(from, to, this.#map)
+    drain(start = 0, end = this.#map.size): Drain<T, T> {
+        return new Drain(start, end, this.#map);
     }
 
-    get(x: T): Option<T> {
-        return this.#map.get(x as Orderable<T>)
+    hasIndex(index: number): boolean {
+        return this.#map.getIndex(index) === null;
     }
 
-    get_full(x: T): Option<[number, T, null]> {
-        return this.#map.get_full(x as Orderable<T>)
+    getRange(start = 0, end = this.#map.size) {
+        this.#map
+            .keys()
+            .skip(start)
+            .take(end - start);
     }
 
-    get_index(index: number): Option<T> {
-        return this.#map.get_index(index)
+    indexOf(x: T): Option<number> {
+        return this.#map.indexOf(x as Orderable<T>);
     }
 
-    get_range(range: Range) {
-        return this.#map.get_range(range)
+    add(value: T): Option<T> {
+        return this.#map.set(value as Orderable<T>, value as Orderable<T>);
     }
 
-    get_index_of(x: Orderable<T>): Option<number> {
-        return this.#map.get_index_of(x)
+    addFull(value: T): [number, Option<T>] {
+        return this.#map.setFull(value as Orderable<T>, value as Orderable<T>);
     }
 
-    insert(value: Orderable<T>): Option<T> {
-        return this.#map.insert(value, null);
+    addBefore(index: number, value: T): [number, boolean] {
+        const res = this.#map.shiftInsert(index, value as Orderable<T>, value as Orderable<T>)
+        return [index, res === null];
     }
 
-    insert_full(value: Orderable<T>): [number, Option<T>] {
-        return this.#map.insert_full(value, null);
-    }
-
-    insert_before(index: number, value: Orderable<T>): [number, boolean] {
-        const res = this.#map.shift_insert(index, value, null)
+    addAfter(index: number, value: T): [number, boolean] {
+        const res = this.#map.shiftInsert(Math.min(this.#map.size, index + 1), value as Orderable<T>, value as Orderable<T>)
         return [index, res === null];
     }
 
     keys(): ExactSizeDoubleEndedIterator<T> {
-        return this.#map.keys()
+        return this.#map.keys();
     }
 
     values(): ExactSizeDoubleEndedIterator<T> {
-        return this.#map.keys()
+        return this.#map.keys();
     }
 
-    entries(): DoubleEndedIterator<[T, null]> {
-        return this.#map.entries()
+    entries(): ExactSizeDoubleEndedIterator<[T, T]> {
+        return this.#map.keys().map(k => [k, k]) as ExactSizeDoubleEndedIterator<[T, T]>
     }
 
     iter(): ExactSizeDoubleEndedIterator<T> {
