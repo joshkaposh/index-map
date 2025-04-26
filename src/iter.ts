@@ -1,7 +1,6 @@
 import { type IterInputType, type SizeHint, type Iterator, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, done, iter, item, } from 'joshkaposh-iterator';
 import type { IndexSet } from "./set";
-import type { Bucket, IndexMap } from './map';
-import type { Ord, Orderable } from './util';
+import type { Bucket, IndexMap, Ord, Orderable } from './map';
 import type { Option } from 'joshkaposh-option';
 
 export class Intersection<T extends Ord> extends DoubleEndedIterator<T> {

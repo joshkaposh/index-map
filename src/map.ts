@@ -324,12 +324,11 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     toReversed() {
         const reversed_indices = this.#indices.toReversed();
         const map = this.#map;
-        const reversed_map = new Map(Array.from(reversed_indices, (_, key) => {
+        const reversed_map = new Map(Array.from(reversed_indices, (key, i) => {
             const hashed_key = this.#hash(key as Orderable<K>);
-            return [hashed_key, map.get(hashed_key)!];
+            return [hashed_key, [i, map.get(hashed_key)![1]] as Bucket<V>];
         }))
         return new IndexMap(reversed_map, reversed_indices, this.#hash)
-
     }
 
     /**
@@ -429,9 +428,27 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
             }
         }
 
-
         this.#indices.sort(compare);
         this.#syncIndices();
+    }
+
+    toSorted(cmp?: (k1: K, v1: V, k2: K, v2: V) => -1 | 0 | 1) {
+        const indices = this.#indices.toSorted(cmp ? (a: K, b: K) => cmp(a, this.get(a)!, b, this.get(b)!) : (a: K, b: K) => {
+            if (a < b) {
+                return -1
+            } else if (a > b) {
+                return 1;
+            } else {
+                return 0
+            }
+        });
+
+        const map = new Map(Array.from(indices, (i, key) => {
+            const hashed_key = this.#hash(key as Orderable<K>);
+            return [hashed_key, [i, this.#map.get(hashed_key)![1]]] as [K, Bucket<V>];
+        }))
+
+        return new IndexMap(map, indices, this.#hash)
     }
 
     splice(from: number, to: number, replace_with: IterInputType<[K, V]>): Splice<K, V> {

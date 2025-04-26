@@ -101,9 +101,9 @@ test('sort', () => {
     const expected = [[0, 1], [1, 1], [2, 1], [5, 4]]
     const s = new IndexMap([[1, 1], [0, 1], [5, 4], [2, 1]]);
 
-    s.sortKeys();
+    s.sort();
     expect(s.toArray()).toEqual(expected);
-    s.sortBy((k1, v1, k2, v2) => {
+    s.sort((k1, _, k2, __) => {
         if (k1 < k2) {
             return 1
         } else if (k1 === k2) {
