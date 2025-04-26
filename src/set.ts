@@ -123,8 +123,17 @@ export class IndexSet<
         this.#map.retain(keep)
     }
 
+
     reverse() {
         this.#map.reverse();
+    }
+
+    /**
+     * 
+     * @returns a copy of an [`IndexSet`] with its elements reversed.
+     */
+    toReversed() {
+        return this.#map.toReversed();
     }
 
     shift(): Option<T> {
@@ -160,12 +169,16 @@ export class IndexSet<
         return this.#map.deleteEntry(value as Orderable<T>)?.[0]
     }
 
-    sort() {
-        this.#map.sortKeys();
-    }
-
-    sortBy(cmp: (a: T, b: T) => -1 | 0 | 1) {
-        this.#map.sortBy((a, _, b) => cmp(a, b))
+    sort(cmp?: (a: T, b: T) => -1 | 0 | 1) {
+        this.#map.sort(cmp ? (a, _, b) => cmp(a, b) : (a, _, b) => {
+            if (a < b) {
+                return -1
+            } else if (a > b) {
+                return 1;
+            } else {
+                return 0
+            }
+        });
     }
 
     isSorted(): boolean {

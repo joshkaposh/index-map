@@ -251,7 +251,7 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
 
     isSorted(): boolean {
         let calls = 0;
-        this.sortBy((a, _, b) => {
+        this.sort((a, _, b) => {
             if (a > b) {
                 calls++;
                 return 0
@@ -319,6 +319,17 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     reverse() {
         this.#indices.reverse();
         this.#syncIndices()
+    }
+
+    toReversed() {
+        const reversed_indices = this.#indices.toReversed();
+        const map = this.#map;
+        const reversed_map = new Map(Array.from(reversed_indices, (_, key) => {
+            const hashed_key = this.#hash(key as Orderable<K>);
+            return [hashed_key, map.get(hashed_key)!];
+        }))
+        return new IndexMap(reversed_map, reversed_indices, this.#hash)
+
     }
 
     /**
@@ -407,25 +418,19 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         return this.#shiftRemoveFullUnchecked(index, hashed_key, value)[ENTRY_VALUE];
     }
 
-    sortBy(cmp: (k1: K, v1: V, k2: K, v2: V) => -1 | 0 | 1) {
-        const compare = (a: K, b: K) => cmp(a, this.get(a)!, b, this.get(b)!)
-        this.#indices.sort(compare);
-        this.#syncIndices();
-    }
-
-    sortKeys() {
-        this.#indices.sort((a, b) => {
-            const hA = this.#hash(a)
-            const hB = this.#hash(b);
-            if (hA < hB) {
+    sort(cmp?: (k1: K, v1: V, k2: K, v2: V) => -1 | 0 | 1) {
+        const compare = cmp ? (a: K, b: K) => cmp(a, this.get(a)!, b, this.get(b)!) : (a: K, b: K) => {
+            if (a < b) {
                 return -1
-            } else if (hA > hB) {
+            } else if (a > b) {
                 return 1;
             } else {
                 return 0
             }
-        });
-        // sync indices in buckets
+        }
+
+
+        this.#indices.sort(compare);
         this.#syncIndices();
     }
 
