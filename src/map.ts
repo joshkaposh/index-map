@@ -31,40 +31,30 @@ export type Bucket<T> = [number, T];
 export type Entry<K, V> = [number, K, V];
 
 export type Hasher<K1, K2> = (key: K1) => K2
-export type DefaultHasher<K extends Ord> = Hasher<K, K>;
+export type DefaultHasher<K> = Hasher<K, K>;
+
+export function valueOf<T>(key: T) {
+    return key ? key.valueOf() as T : key
+}
 
 const INDEX = 0;
 const BUCKET_VALUE = 1;
 const ENTRY_KEY = 1;
 const ENTRY_VALUE = 2;
 
-function defaultHasher<T>(key: T) {
-    return key;
-}
-
-export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher<K>> {
+export class IndexMap<K extends Ord = any, V extends any = any, S extends Hasher<NoInfer<K>, any> = DefaultHasher<NoInfer<K>>> {
     #map: Map<ReturnType<S>, Bucket<V>>;
     #indices: K[];
     #hash: S;
 
-    constructor(map?: IterInputType<readonly [K, V]>)
-    constructor(map?: Map<K, Bucket<V>>, indices?: K[])
-    constructor(map: Map<K, Bucket<V>>, indices: K[], hasher: Hasher<K, Ord>)
-    constructor(map: Map<K, Bucket<V>> | IterInputType<readonly [K, V]> = new Map(), indices: K[] = [], hasher: S = defaultHasher as S) {
-        if (map instanceof Map) {
-            this.#map = map as Map<ReturnType<S>, Bucket<V>>;
-            this.#indices = indices;
-        } else {
-            const entries = iter(map).enumerate().map(([i, [k, v]]) => [k, [i, v]] as [K, Bucket<V>]).collect();
-            const keys = iter(entries).map(([k]) => k).collect() as K[]
-            this.#map = new Map(entries) as Map<ReturnType<S>, Bucket<V>>
-            this.#indices = keys
-        }
+    constructor(map: Map<K, Bucket<V>> = new Map(), indices: K[] = [], hasher: S = valueOf as S) {
+        this.#map = map as Map<ReturnType<S>, Bucket<V>>;
+        this.#indices = indices;
         this.#hash = hasher;
     }
 
     static withCapacity<K extends Ord, V>(capacity: number): IndexMap<K, V, DefaultHasher<K>> {
-        return new IndexMap<K, V, DefaultHasher<K>>(new Map(), new Array(capacity))
+        return new IndexMap<K, V, DefaultHasher<K>>(new Map(), new Array(capacity), valueOf)
     }
 
     static withHasher<K extends Ord, V, S extends Hasher<K, Ord> = Hasher<K, Ord>>(hasher: S): IndexMap<K, V, S> {
@@ -77,30 +67,75 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         return m
     }
 
-    static from<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher<K>>(iterable: IterInputType<[K, V]>, hasher: S = defaultHasher as S): IndexMap<K, V, S> {
-        const entries = iter(iterable)
-            .enumerate()
-            .map(([i, [k, v]]) => [hasher(k), [i, v]] as [K, Bucket<V>])
-            .collect();
-        const indices = iter(iterable)
-            .map(([k]) => k)
-            .collect() as K[]
+    static from<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher<K>>(iterable: IterInputType<[K, V]>, hasher: S = valueOf as S): IndexMap<K, V, S> {
+        return new IndexMap(
+            iter(iterable)
+                .enumerate()
+                .map(([i, [k, v]]) => [hasher(k), [i, v]] as [K, Bucket<V>])
+                .collect(Map) as Map<K, Bucket<V>>,
+            iter(iterable)
+                .map(([k]) => k)
+                .collect()
+        );
 
-        return new IndexMap(new Map(entries), indices);
+    }
+
+    get isEmpty(): boolean {
+        return this.#map.size === 0;
+    }
+
+    get size(): number {
+        return this.#map.size;
     }
 
     get hasher() {
         return this.#hash;
     }
 
+    /**
+     * This should only be used if [`IndexMap`] keys do not hold state
+     * that changes hashing behaviour.
+     * 
+     * Can optionally be passed a `clone` function that will be used for cloning map values
+     * 
+     * The existing keys will be reused,
+     * i.e. no new references for keys are made.
+     * 
+     * Can optionally be passed a `cloner` callback for each value in the map.
+     *  
+     * @returns a new [`IndexMap`] with it's elements cloned.
+    */
+    clone(cloner: (value: V) => V = valueOf): IndexMap<K, V, S> {
+        const entries: [K, Bucket<V>][] = [];
+        for (const [key, [index, value]] of this.#map.entries()) {
+            entries.push([key, [index, cloner(value)]]);
+        }
+
+        return new IndexMap<K, V, S>(
+            new Map(entries),
+            [...this.#indices],
+            this.#hash
+        )
+    }
+
+    /**
+     * @returns an iterator over the keys of this [`IndexMap`].
+     */
     keys(): ExactSizeDoubleEndedIterator<K> {
         return iter(this.#indices);
     }
 
+    /**
+     * @returns an iterator over the values of this [`IndexMap`].
+     */
     values(): DoubleEndedIterator<V> {
         return this.iter().map(([_, v]) => v);
     }
 
+
+    /**
+     * @returns an iterator over the key,value pairs of this [`IndexMap`].
+     */
     entries(): DoubleEndedIterator<[K, V]> {
         return iter(this.#indices).map((k) => {
             const v = this.#map.get(this.#hash(k))![BUCKET_VALUE];
@@ -108,38 +143,63 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         })
     }
 
+    /**
+     * @returns an array of key, value pairs.
+     */
     toArray(): [K, V][] {
         return this.entries().collect();
     }
 
+    /**
+     * Used by [Symbol.iterator], short-hand instead of calling `instance[Symbol.iterator]()`
+     */
     iter(): DoubleEndedIterator<[K, V]> {
         return this.entries();
     }
 
-    clear(): void {
+    /**
+     * Clears the [`IndexMap`]. This will also change the capacity.
+     */
+    clear() {
         this.#map.clear();
         this.#indices.length = 0;
     }
 
-    has(key: K): boolean {
+    /**
+     * @returns true if `key` was in the [`IndexMap`]
+     */
+    has(key: K) {
         return this.#map.has(this.#hash(key));
     }
 
-    drain(start: number, end: number): Drain<K, V> {
+    /**
+     * @returns a draining iterator (See `Drain` for more information) over the given range
+     */
+    drain(start = 0, end = this.#map.size): Drain<K, V> {
         return new Drain(start, end, this);
     }
 
+    /**
+     * @returns the value at index 0 or undefined if empty.
+     */
     first(): Option<V> {
         return this.#indices.length === 0 ?
             undefined :
             this.#map.get(this.#hash(this.#indices[0]))![BUCKET_VALUE];
     }
 
+    /**
+     * @returns the value `V` in the map corresponding to `key`.
+     * If the index of the key is known, consider using `getIndex`.
+     */
     get(key: K): Option<V> {
         const bucket = this.#map.get(this.#hash(key));
         return bucket ? bucket[BUCKET_VALUE] : undefined;
     }
 
+    /**
+     * @returns the [index, key, value] entry corresponding to `key`
+     */
     getFull(key: K): Option<Entry<K, V>> {
         const v = this.#map.get(this.#hash(key));
         if (!v) {
@@ -149,12 +209,16 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         return [index, key, value];
     }
 
+    /**
+     * If the index of the key is not known, consider using `get`.
+     * @returns the value `V` in the map by its index.
+     */
     getIndex(index: number): Option<V> {
         return oob(index, this.#map.size) ? undefined : this.#map.get(this.#hash(this.#indices[index]))![BUCKET_VALUE]!
     }
 
     /**
-     * @returns the key-value pair found at the given index, if one was found.
+     * @returns the key-value pair at the given index, if one was found.
      */
     getIndexEntry(index: number): Option<[K, V]> {
         if (oob(index, this.#map.size)) {
@@ -169,11 +233,10 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     }
 
     /**
-     * @returns the index of the key if one is present.
+     * @returns the index of the key or -1 if not present.
      */
-    indexOf(key: K): Option<number> {
-        const bucket = this.#map.get(this.#hash(key));
-        return bucket ? bucket[INDEX] : undefined;
+    indexOf(key: K): number {
+        return this.#map.get(this.#hash(key))?.[INDEX] ?? -1;
     }
 
     /**
@@ -245,10 +308,6 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     //     return TODO('IndexMap::insert_sorted()', key, value);
     // }
 
-    get isEmpty(): boolean {
-        return this.#map.size === 0;
-    }
-
     isSorted(): boolean {
         let calls = 0;
         this.sort((a, _, b) => {
@@ -264,37 +323,56 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
         return calls === 0
     }
 
+    /**
+     * @returns the last value or undefined if empty.
+     */
     last(): Option<V> {
         const last_index = this.#map.size - 1;
         return last_index >= 0 ? this.getIndex(last_index) : undefined;
     }
 
-    get size(): number {
-        return this.#map.size;
-    }
-
+    /**
+     * moves an `Entry` in the [`IndexMap`] from one index to another.
+     */
     moveIndex(from: number, to: number) {
-        if (from < to) {
-            if (from + 1 === to) {
-                this.swapIndices(from, to)
-                return
-            }
-            this.#shiftUp(from, to)
-        } else {
-            if (from - 1 === to) {
-                this.swapIndices(from, to);
-                return;
-            }
-            this.#shiftDown(from, to)
+        const max = from <= to ? from : to;
+        const min = from <= to ? from : to;
+
+        if (min + 1 === max) {
+            this.swapIndices(min, max)
+            return
         }
+
+        from < to ? this.#shiftUp(from, to) : this.#shiftDown(from, to);
+
+        // if (from < to) {
+        //     if (from + 1 === to) {
+        //         this.swapIndices(from, to)
+        //         return
+        //     }
+        //     this.#shiftUp(from, to)
+        // } else {
+        //     if (from - 1 === to) {
+        //         this.swapIndices(from, to);
+        //         return;
+        //     }
+        //     this.#shiftDown(from, to)
+        // }
     }
 
+    /**
+     * @returns a value if the [`IndexMap`] was not empty, undefined otherwise. 
+     */
     pop(): Option<V> {
-        return this.#indices.length > 0 ?
-            this.delete(this.#indices[this.#indices.length - 1])
+        const size = this.#map.size
+        return size > 0 ?
+            this.delete(this.#indices[size - 1])
             : undefined
     }
 
+    /**
+     * @returns an [`Entry`] if the [`IndexMap`] was not empty, undefined otherwise. 
+     */
     popFull(): Option<Entry<K, V>> {
         const index = this.#map.size - 1;
         if (index > 0) {
@@ -303,24 +381,32 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
             this.#indices.pop();
             return full;
         }
+
         return undefined
     }
 
     retain(keep: (key: K, value: V) => boolean) {
         // keep only the elements this closure returns true for
-        const entries = this.iter().rev();
-        entries.rev().for_each(([k, v]) => {
+        this.iter().rev().for_each(([k, v]) => {
             if (!keep(k, v)) {
                 this.delete(k);
             }
         })
     }
 
+    /**
+     * Reverses all the keys of this `IndexMap`.
+     */
     reverse() {
         this.#indices.reverse();
         this.#syncIndices()
     }
 
+    /**
+     * Creates a new `IndexMap` and reverses it's keys.
+     * This is equivalent to calling .clone().reverse().
+     * @returns a new `IndexMap` with it's keys reversed. 
+     */
     toReversed() {
         const reversed_indices = this.#indices.toReversed();
         const map = this.#map;
@@ -332,9 +418,11 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
     }
 
     /**
-     * Similar to array.shift().
-     * shift() pops the key-value pair at the front of the map
-     * and returns V or nothing if the map is empty
+     * Similar to `Array.prototype.shift`.
+     * Pops the value at the front of the map
+     * and returns it.
+     * This does nothing if the `IndexMap` is empty.
+     * @returns value `V` or nothing if the `IndexMap` is empty.
      */
     shift(): Option<V> {
         return this.#map.size > 0 ?
@@ -342,11 +430,27 @@ export class IndexMap<K extends Ord, V, S extends Hasher<K, any> = DefaultHasher
             undefined
     }
 
+    /**
+     * Similar to `Array.prototype.shift`.
+     * Pops the key-value pair at the front of the map
+     * and returns it.
+     * This does nothing if the `IndexMap` is empty.
+     * @returns a key-value pair or nothing if the `IndexMap` is empty.
+     */
     shiftEntry(): Option<[K, V]> {
         return this.#map.size > 0 ?
             this.deleteEntry(this.#indices[0]) : undefined;
     }
 
+    /**
+     * Inserts a key-value pair into the map at the given index.
+     * 
+     * This method will insert a new pair into the map at the index
+     * by shifting any elements it replaced back one index.
+     * 
+     * @throws **Safety:** throws a RangeError if `index > map.size`.
+     * @returns the value at `index` before it was moved, or undefined if moving wasn't needed.
+     */
     shiftInsert(index: number, key: K, value: V): Option<V> {
         if (index > this.#map.size) {
             throw new RangeError(`index ${index} cannot exceed length ${this.#map.size}`)

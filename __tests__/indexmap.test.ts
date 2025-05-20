@@ -44,11 +44,11 @@ test('hasher', () => {
     expect(m.set(new Something(0, true), 25)).toEqual(0);
     expect(m.get(new Something(0, true))).toEqual(25);
 
-    assert(is_some(m.indexOf(new Something(0, true))));
-    assert(is_some(m.indexOf(new Something(0, false))));
-    assert(!is_some(m.indexOf(new Something(1, true))));
-    assert(is_some(m.indexOf(new Something(1, false))));
 
+    assert(-1 < m.indexOf(new Something(0, true)))
+    assert(-1 < m.indexOf(new Something(0, false)));
+    assert(-1 === m.indexOf(new Something(1, true)));
+    assert(-1 < m.indexOf(new Something(1, false)));
 })
 
 test('hasher_swap_remove', () => {
@@ -85,6 +85,22 @@ test('hasher_swap_remove', () => {
     assert(m.size === 0);
 })
 
+class Key {
+    value: string;
+    constructor(value: string) {
+        this.value = value;
+    }
+    [Symbol.toPrimitive]() {
+
+    }
+}
+
+test('from', () => {
+    const map = new IndexMap();
+
+
+})
+
 test('retain', () => {
     const map = new IndexMap<number, number>();
 
@@ -99,7 +115,7 @@ test('retain', () => {
 
 test('sort', () => {
     const expected = [[0, 1], [1, 1], [2, 1], [5, 4]]
-    const s = new IndexMap([[1, 1], [0, 1], [5, 4], [2, 1]]);
+    const s = IndexMap.from([[1, 1], [0, 1], [5, 4], [2, 1]]);
 
     s.sort();
     expect(s.toArray()).toEqual(expected);
@@ -249,7 +265,7 @@ test('shift_insert', () => {
         map.set(c, null);
     })
 
-    assert(map.indexOf('*') === undefined);
+    assert(map.indexOf('*') === -1);
     map.shiftInsert(10, '*', null);
     assert(map.indexOf('*') === 10);
 

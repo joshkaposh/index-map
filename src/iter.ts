@@ -1,6 +1,6 @@
 import { type IterInputType, type SizeHint, type Iterator, DoubleEndedIterator, ExactSizeDoubleEndedIterator, ExactSizeIterator, done, iter, item, } from 'joshkaposh-iterator';
 import type { IndexSet } from "./set";
-import type { Bucket, IndexMap, Ord, Orderable } from './map';
+import type { Bucket, IndexMap, Ord } from './map';
 import type { Option } from 'joshkaposh-option';
 
 export class Intersection<T extends Ord> extends DoubleEndedIterator<T> {
@@ -150,12 +150,12 @@ export class SymmetricDifference<T extends Ord> extends DoubleEndedIterator<T> {
     }
 }
 
-export class Drain<K, V> extends ExactSizeIterator<[K, V]> {
-    #map: IndexMap<Orderable<K>, V>;
+export class Drain<K extends Ord, V> extends ExactSizeIterator<[K, V]> {
+    #map: IndexMap<K, V>;
     #taken: V[];
     #start: number;
     #end: number;
-    constructor(start: number, end: number, map: IndexMap<Orderable<K>, V>) {
+    constructor(start: number, end: number, map: IndexMap<K, V>) {
         super();
         this.#start = start - 1;
         this.#end = end;
