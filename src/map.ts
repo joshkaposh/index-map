@@ -118,6 +118,27 @@ export class IndexMap<K extends Ord = any, V extends any = any, S extends Hasher
         )
     }
 
+    cloneFrom(src: IndexMap<K, V, S>, cloner: (value: V) => V = valueOf) {
+        const src_indices = src.#indices,
+            src_map = src.#map,
+            dst_map = this.#map,
+            indices = new Array(src.size);
+
+        dst_map.clear();
+        for (let i = 0; i < src_indices.length; i++) {
+            const key = src_indices[i];
+            indices[i] = key;
+            const hashed_key = this.#hash(key);
+            const [index, value] = src_map.get(hashed_key)!;
+            dst_map.set(hashed_key, [index, cloner(value)]);
+        }
+
+        this.#indices = indices;
+    }
+
+
+
+
     /**
      * @returns an iterator over the keys of this [`IndexMap`].
      */
